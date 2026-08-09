@@ -1,64 +1,59 @@
 import React, { useEffect, useRef, useState } from "react";
 import { getWeather } from "./api.js";
 import WeatherPopup from "./components/weatherPopUps.jsx";
-import {
-  Viewer,
-  createWorldTerrainAsync,
-  ScreenSpaceEventHandler,
-  ScreenSpaceEventType,
-  Cartographic,
-  Math as CesiumMath
-} from "cesium";
+import { Map as MapLibreMap, NavigationControl, GeolocateControl } from "maplibre-gl";
 
 function App() {
-  const cesiumContainerRef = useRef(null);
+  const mapContainerRef = useRef(null);
+  const mapRef = useRef(null);
   const [weatherData, setWeatherData] = useState(null);
   const [popupPosition, setPopupPosition] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
-    const initViewer = async () => {
-      const terrainProvider = await createWorldTerrainAsync();
-      const viewer = new Viewer(cesiumContainerRef.current, {
-        terrainProvider: terrainProvider
-      });
-
-      viewer.scene.globe.enableLighting = true;
-
-      // On click handler
-      const handler = new ScreenSpaceEventHandler(viewer.scene.canvas);
-handler.setInputAction(async function (movement) {
-  try {
-    const cartesian = viewer.camera.pickEllipsoid(movement.position);
-    if (!cartesian) return;
-
-    const cartographic = Cartographic.fromCartesian(cartesian);
-    const lat = CesiumMath.toDegrees(cartographic.latitude);
-    const lon = CesiumMath.toDegrees(cartographic.longitude);
-
-    const weather = await getWeather({ lat, lon });
-    setWeatherData(weather);
-    setPopupPosition({
-      x: movement.position.x,
-      y: movement.position.y,
+    const map = new MapLibreMap({
+      container: mapContainerRef.current,
+      style: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
+      center: [78.9629, 20.5937], // Center on India
+      zoom: 4,
+      attributionControl: true,
     });
-  } catch (error) {
-    console.error('Failed to get weather:', error);
-    // Optionally show an error message to the user
-    alert(error.message);
-  }
-}, ScreenSpaceEventType.LEFT_CLICK);
-      return () => {
-        handler.destroy();
-        viewer.destroy();
-      };
-    };
 
-    initViewer();
+    map.addControl(new NavigationControl(), "top-right");
+    map.addControl(new GeolocateControl({
+      positionOptions: { enableHighAccuracy: true },
+      trackUserLocation: true,
+    }));
+
+    mapRef.current = map;
+
+    map.on("click", async (e) => {
+      const { lng, lat } = e.lngLat;
+
+      try {
+        const weather = await getWeather({ lat, lon: lng });
+        
+        // Get pixel position of click for popup placement
+        const point = map.project(e.lngLat);
+        setWeatherData(weather);
+        setPopupPosition({
+          x: point.x,
+          y: point.y,
+        });
+      } catch (error) {
+        console.error("Failed to get weather:", error);
+        alert(error.message);
+      }
+    });
+
+    return () => {
+      map.remove();
+      mapRef.current = null;
+    };
   }, []);
 
   return (
     <div>
-      <div ref={cesiumContainerRef} style={{ height: "100vh", width: "100vw" }} />
+      <div ref={mapContainerRef} style={{ height: "100vh", width: "100vw" }} />
       <WeatherPopup
         data={weatherData}
         position={popupPosition}
