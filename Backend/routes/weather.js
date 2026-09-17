@@ -40,7 +40,7 @@ router.get("/", async (req, res) => {
         appid: apiKey,
         units: "metric"
       },
-      timeout: 8000 // 8 second timeout to avoid denial of service through connection exhaustion
+      timeout: 15000 // 15 second timeout to handle high-latency connections safely
     });
 
     res.json(response.data);
