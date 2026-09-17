@@ -8,24 +8,55 @@ router.get("/", async (req, res) => {
   const apiKey = process.env.WEATHER_API_KEY;
 
   if (!apiKey) {
-    return res.status(500).json({ error: "Weather API key not configured" });
+    return res.status(500).json({ error: "Weather API key not configured on server" });
   }
 
-  if (!lat || !lon) {
-    return res.status(400).json({ error: "Latitude and longitude are required" });
+  if (lat === undefined || lon === undefined || lat === null || lon === null) {
+    return res.status(400).json({ error: "Latitude and longitude are required query parameters" });
+  }
+
+  const latitude = parseFloat(lat);
+  const longitude = parseFloat(lon);
+
+  // Validate that latitude and longitude are valid numbers within realistic geo ranges
+  if (
+    Number.isNaN(latitude) ||
+    Number.isNaN(longitude) ||
+    latitude < -90 ||
+    latitude > 90 ||
+    longitude < -180 ||
+    longitude > 180
+  ) {
+    return res.status(400).json({
+      error: "Invalid coordinates. Latitude must be between -90 and 90, and longitude between -180 and 180."
+    });
   }
 
   try {
-    const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric`;
-    const response = await axios.get(url);
+    const response = await axios.get("https://api.openweathermap.org/data/2.5/weather", {
+      params: {
+        lat: latitude,
+        lon: longitude,
+        appid: apiKey,
+        units: "metric"
+      },
+      timeout: 8000 // 8 second timeout to avoid denial of service through connection exhaustion
+    });
+
     res.json(response.data);
   } catch (error) {
-    console.error('Weather API Error:', error.response?.data || error.message);
-    res.status(500).json({ 
-      error: "Failed to fetch weather data",
-      details: error.response?.data || error.message 
+    // Log details internally for debugging without exposing secrets or stack traces to client
+    console.error("Weather API upstream error:", error.response?.status, error.response?.data?.message || error.message);
+
+    const clientStatus = error.response?.status && error.response.status >= 400 && error.response.status < 500
+      ? error.response.status
+      : 502;
+
+    res.status(clientStatus).json({
+      error: "Failed to retrieve weather data from provider. Please try again later."
     });
   }
 });
 
 export default router;
+

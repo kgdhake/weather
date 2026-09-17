@@ -1,13 +1,17 @@
-const API_BASE_URL = 'http://localhost:5001/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api';
 
 export const getWeather = async ({ lat, lon }) => {
   try {
-    const response = await fetch(
-      `${API_BASE_URL}/weather?lat=${lat}&lon=${lon}`
-    );
+    const params = new URLSearchParams({
+      lat: String(lat),
+      lon: String(lon)
+    });
+
+    const response = await fetch(`${API_BASE_URL}/weather?${params.toString()}`);
     
     if (!response.ok) {
-      throw new Error('Weather data fetch failed');
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Weather request failed (${response.status})`);
     }
 
     const data = await response.json();

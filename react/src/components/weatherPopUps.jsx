@@ -7,7 +7,7 @@ const WeatherPopup = ({ data, position, onClose }) => {
   const weatherMain = data?.weather?.[0]?.main ?? "N/A";
   const weatherDesc = data?.weather?.[0]?.description ?? "";
   const iconCode = data?.weather?.[0]?.icon;
-  const iconUrl = iconCode
+  const iconUrl = iconCode && /^[0-9]{2}[dn]$/.test(String(iconCode))
     ? `https://openweathermap.org/img/wn/${iconCode}@2x.png`
     : null;
 
